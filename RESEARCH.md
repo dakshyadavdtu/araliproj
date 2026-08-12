@@ -1,0 +1,42 @@
+# Product Research
+
+The assignment was compared with established workflow products to identify useful interaction patterns without expanding a small sequence editor into a general automation platform. The notes below are based on official product documentation.
+
+## Workflow products
+
+| Product | Patterns studied | Adopted in this build | Deferred or avoided, and why |
+| --- | --- | --- | --- |
+| HubSpot | [Enrollment triggers](https://knowledge.hubspot.com/workflows/set-your-workflow-enrollment-triggers), [workflow actions](https://knowledge.hubspot.com/workflows/choose-your-workflow-actions), branches, re-enrollment, activation checks, and workflow history | Enrollment and exit are explicit steps; each card has a concise summary and readiness state; incomplete setup is visible before a sequence is considered ready | Multiple CRM object types, hundreds of actions, deep branching, re-enrollment policies, and live execution history require a backend and would obscure the assignment’s four core node types |
+| Customer.io Journeys | [Campaign creation](https://docs.customer.io/journeys/create-a-campaign/), the [workflow builder](https://docs.customer.io/journeys/send/workflows/builder/), messages, delays, goals, exit criteria, and conditional/random branches | A central workflow with adjacent add points, a dedicated configuration panel, an explicit exit condition, local drafts, and a review-before-run preview | Infinite-canvas controls, multiple message channels, random cohorts, live campaign mutation, analytics, and per-message sending modes were outside the MVP and need execution semantics |
+| Zapier | Linear trigger/action composition, insertion with plus controls, [Filters versus Paths](https://help.zapier.com/hc/en-us/articles/8496180919949-Filter-and-path-rules-in-Zaps), and [durable delay/queue concepts](https://help.zapier.com/hc/en-us/articles/8496288754829-Add-delays-to-Zap-workflows) | Clear ordered cards, insertion between existing steps, compact summaries, and controls that keep the next action obvious | An integration catalog, field mapping, arbitrary Paths, and general-purpose data transforms would add configuration depth without helping the focused email-sequence task |
+| Klaviyo Flows | [Triggers and profile filters](https://help.klaviyo.com/hc/en-us/articles/115002779051), [flow actions and time delays](https://help.klaviyo.com/hc/en-us/articles/115002774932), conditional splits, re-entry, and recipient status | Schedule and timezone configuration, explicit enrollment eligibility, exit behavior, readiness feedback, and an ordered series of messages | Segments, SMS/push channels, send-time optimization, A/B branches, profile-filter re-evaluation, and per-recipient analytics depend on customer data and a delivery backend |
+
+### Resulting product decisions
+
+- Keep the workflow linear and readable. The assignment has a bounded node set, so a vertical ordered list communicates sequence better than a pannable graph.
+- Keep configuration beside the workflow on larger screens and move it into a focused panel on mobile.
+- Separate applied node data from editor drafts. Reviewers can explore a change without silently altering the sequence.
+- Make enrollment, scheduling, exit, and message content first-class rather than hiding them in generic action forms.
+- Use one validation model for card status, overall readiness, and preview. “Ready” should mean the same thing everywhere.
+- Treat preview and persistence as authoring features only. Real execution, recipient state, events, and retry behavior belong on a backend.
+
+## Google Identity Services
+
+The integration follows Google’s official guidance for [creating a Web client and configuring Authorized JavaScript origins](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid) and [rendering the official button with the JavaScript API](https://developers.google.com/identity/gsi/web/guides/display-button).
+
+Adopted:
+
+- load `https://accounts.google.com/gsi/client` dynamically;
+- render Google’s button with `google.accounts.id.renderButton` rather than imitating it;
+- handle the returned credential only inside the callback;
+- retain only a sanitized display profile for the browser session;
+- clear the profile and call `disableAutoSelect` on sign-out;
+- provide a clearly labeled guest preview only when the client ID is not configured.
+
+Deliberately not treated as production authentication:
+
+- Decoding a JWT payload in the browser does not verify it.
+- The credential is not stored, and the guest route does not claim to authenticate a user.
+- A production service must send the ID token to its backend and verify signature, `aud`, `iss`, and `exp` before creating a session, as required by Google’s [server-side verification guide](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
+
+One Tap, automatic sign-in, account linking, domain restriction, and OAuth scopes were not needed for this assignment. The app requests identity for entry only; it does not request access to Google APIs.
