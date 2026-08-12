@@ -1,4 +1,13 @@
+// @vitest-environment jsdom
+
+import '@testing-library/jest-dom/vitest'
+import React from 'react'
+import { cleanup, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { Provider } from 'react-redux'
 import { describe, expect, it } from 'vitest'
+import { afterEach } from 'vitest'
+import App from './App.jsx'
 import {
   createDefaultNode,
   createEmptySequence,
@@ -22,7 +31,19 @@ import {
   selectNode,
   selectIsDirty,
   sequenceReducer,
+  makeStore,
 } from './store.js'
+
+afterEach(() => {
+  cleanup()
+  window.localStorage.clear()
+  window.sessionStorage.clear()
+})
+
+function renderApp() {
+  const app = React.createElement(App)
+  render(React.createElement(Provider, { store: makeStore() }, app))
+}
 
 class MemoryStorage {
   values = new Map()
@@ -147,5 +168,40 @@ describe('local persistence', () => {
 
     storage.setItem(STORAGE_KEY, JSON.stringify({ version: 99 }))
     expect(loadSequence(storage)).toBeNull()
+  })
+})
+
+describe('sequence builder', () => {
+  it('opens the review flow from an empty sequence and loads the example', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(screen.getByRole('button', { name: 'Preview the demo' }))
+    expect(screen.getByRole('heading', { name: 'Start with your first step' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Load example' }))
+    expect(screen.getByText('5 of 5 steps ready')).toBeInTheDocument()
+    expect(screen.getByText('Every weekday at 9:00 AM')).toBeInTheDocument()
+  })
+
+  it('keeps the applied contact when an editor draft is cancelled', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(screen.getByRole('button', { name: 'Preview the demo' }))
+    await user.click(screen.getByRole('button', { name: 'Load example' }))
+    await user.click(screen.getByRole('button', {
+      name: 'Edit Enrollment: Enroll Alex Morgan · alex@example.com',
+    }))
+
+    const nameField = screen.getByRole('textbox', { name: 'Contact name *' })
+    await user.clear(nameField)
+    await user.type(nameField, 'Changed draft')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.getByRole('button', {
+      name: 'Edit Enrollment: Enroll Alex Morgan · alex@example.com',
+    })).toBeInTheDocument()
+    expect(screen.queryByText('Changed draft')).not.toBeInTheDocument()
   })
 })
