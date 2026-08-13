@@ -198,7 +198,7 @@ describe('sequence builder', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByRole('button', { name: 'Continue to assignment demo' }))
+    await user.click(screen.getByRole('button', { name: 'Enter as guest' }))
     expect(screen.getByRole('heading', { name: 'Start with your first step' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Load example' }))
@@ -210,7 +210,7 @@ describe('sequence builder', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByRole('button', { name: 'Continue to assignment demo' }))
+    await user.click(screen.getByRole('button', { name: 'Enter as guest' }))
     await user.click(screen.getByRole('button', { name: 'Load example' }))
     await user.click(screen.getByRole('button', {
       name: 'Edit Enrollment: Enroll Alex Morgan · alex@example.com',
@@ -231,7 +231,7 @@ describe('sequence builder', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByRole('button', { name: 'Continue to assignment demo' }))
+    await user.click(screen.getByRole('button', { name: 'Enter as guest' }))
     await user.click(screen.getByRole('button', { name: 'Add first step' }))
     await user.click(screen.getByRole('button', { name: /Send email/ }))
     await user.click(screen.getByRole('button', { name: 'Preview sequence' }))
@@ -245,7 +245,7 @@ describe('sequence builder', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByRole('button', { name: 'Continue to assignment demo' }))
+    await user.click(screen.getByRole('button', { name: 'Enter as guest' }))
     await user.click(screen.getByRole('button', { name: 'Load example' }))
     await user.click(screen.getByRole('button', {
       name: 'Edit Enrollment: Enroll Alex Morgan · alex@example.com',
@@ -260,7 +260,7 @@ describe('sequence builder', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByRole('button', { name: 'Continue to assignment demo' }))
+    await user.click(screen.getByRole('button', { name: 'Enter as guest' }))
     await user.click(screen.getByRole('button', { name: 'Load example' }))
     await user.click(screen.getByRole('button', {
       name: 'Edit Enrollment: Enroll Alex Morgan · alex@example.com',
@@ -280,7 +280,7 @@ describe('sequence builder', () => {
     const user = userEvent.setup()
     const view = renderApp()
 
-    await user.click(screen.getByRole('button', { name: 'Continue to assignment demo' }))
+    await user.click(screen.getByRole('button', { name: 'Enter as guest' }))
     await user.click(screen.getByRole('button', { name: 'Load example' }))
     await user.click(screen.getByRole('button', {
       name: 'Edit Enrollment: Enroll Alex Morgan · alex@example.com',

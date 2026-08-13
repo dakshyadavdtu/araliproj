@@ -89,7 +89,7 @@ export function getAuthErrorMessage(error) {
     case 'auth/too-many-requests':
       return 'Sign-in is temporarily limited after too many attempts. Please try again later.'
     case 'auth/missing-config':
-      return 'Google sign-in is not available in this demo yet. Continue to the assignment demo below.'
+      return 'Google sign-in is not available in this demo yet. Enter as a guest below.'
     default:
       return 'Google sign-in could not be completed. Please try again.'
   }

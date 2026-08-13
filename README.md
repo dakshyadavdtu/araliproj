@@ -10,7 +10,7 @@ The source is JavaScript and JSX. There is no TypeScript, custom application bac
 
 No Firebase project or Google account is required to review the assignment.
 
-1. Open the live demo and choose **Continue to assignment demo**.
+1. Open the live demo and choose **Enter as guest**.
 2. Select **Load example** if the editor is empty. A prior guest save may be restored in the same browser instead.
 3. Select any step, change a field, and use **Apply changes**.
 4. Open **Preview** to read the sequence as a plain-language journey.
@@ -28,7 +28,7 @@ No Firebase project or Google account is required to review the assignment.
 
 *Desktop: the ordered workflow remains visible while the selected scheduler is edited in the right-hand inspector.*
 
-![Sign-in screen with Google authentication and assignment demo access](./screenshots/sign-in.png)
+![Sign-in screen with Google authentication and guest access](./screenshots/sign-in.png)
 
 *Entry: Firebase Google sign-in is ready to use when project credentials are supplied, while the clearly labeled demo route keeps the assignment reviewable without credentials.*
 
@@ -55,7 +55,7 @@ No Firebase project or Google account is required to review the assignment.
 - Schema-versioned `localStorage` persistence with defensive parsing.
 - Responsive desktop, tablet, and mobile layouts, including a mobile slide-over editor.
 - Keyboard-visible focus styles, semantic form labels, accessible button names, dialog roles, status announcements, Escape handling, and reduced-motion support.
-- Firebase Authentication with Google sign-in when configured, plus clearly identified assignment-demo access for reviewers.
+- Firebase Authentication with Google sign-in when configured, plus clearly identified guest access for reviewers.
 - Account-scoped browser storage, with local sequence records keyed by Firebase UID so accounts do not share the app's saved draft.
 
 This prototype configures and previews a sequence; it does not schedule or send real email.
@@ -83,7 +83,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. Firebase configuration is optional for assignment review: when it is absent, the entry screen explains that Google sign-in is unavailable and offers **Continue to assignment demo**.
+Open the local URL printed by Vite. Firebase configuration is optional for assignment review: when it is absent, the entry screen explains that Google sign-in is unavailable and offers **Enter as guest**.
 
 Useful commands:
 
@@ -124,13 +124,13 @@ The sign-in flow uses Firebase Authentication's Google provider. The application
 
 For the GitHub Pages build, add the same names as GitHub repository **Variables** under **Settings → Secrets and variables → Actions → Variables**. The deployment workflow passes those values only to the Vite build. Firebase Web configuration identifies the Firebase project; it is not a private server secret. Even so, local `.env` files are ignored so environment-specific values do not become repository noise.
 
-When Firebase is not configured, **Continue to assignment demo** opens the complete editor as a guest. It is a review route, not a simulated sign-in. When Firebase is configured, its SDK owns the authenticated session and the app retains only a sanitized display profile in React state. The user's Firebase UID also scopes the local sequence record.
+When Firebase is not configured, **Enter as guest** opens the complete editor without pretending to authenticate the reviewer. When Firebase is configured, its SDK owns the authenticated session and the app retains only a sanitized display profile in React state. The user's Firebase UID also scopes the local sequence record.
 
 The implementation follows Firebase's official [Web setup guide](https://firebase.google.com/docs/web/setup), [Google sign-in guide](https://firebase.google.com/docs/auth/web/google-signin), and [authentication state guidance](https://firebase.google.com/docs/auth/web/start). A future server must still [verify Firebase ID tokens with the Admin SDK](https://firebase.google.com/docs/auth/admin/verify-id-tokens) before trusting the user for backend data or actions.
 
 ## Suggested review flow
 
-1. Open the live demo, or run the app without Firebase values and choose **Continue to assignment demo**.
+1. Open the live demo, or run the app without Firebase values and choose **Enter as guest**.
 2. From the empty builder, add a Scheduler and apply its frequency, time, and timezone.
 3. Add Enrollment and enter a contact name and valid email address.
 4. Add an Exit condition, then add Send email and apply it with the subject or body empty. The card remains **Needs attention** and the editor explains what is missing.
@@ -158,7 +158,7 @@ The application deliberately keeps a flat `src/` structure because the feature s
 src/
 ├── main.jsx          React root and Redux Provider
 ├── App.jsx           authentication-to-builder boundary
-├── AuthGate.jsx      Firebase session boundary and assignment-demo entry
+├── AuthGate.jsx      Firebase session boundary and guest entry
 ├── firebase.js       Firebase setup, Google provider, and profile sanitizing
 ├── Builder.jsx       page orchestration, commands, and transient UI state
 ├── Workflow.jsx      ordered workflow, cards, and add controls

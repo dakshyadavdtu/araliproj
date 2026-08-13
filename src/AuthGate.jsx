@@ -114,7 +114,7 @@ function AuthScreen({ busy, error, onGoogleSignIn, onGuest }) {
           <p className="auth-card__eyebrow">Secure workspace</p>
           <h1 id="auth-title">Welcome to Sequences</h1>
           <p className="auth-card__intro">
-            Continue with your Google account, or enter the assignment demo without signing in.
+            Continue with your Google account, or enter as a guest without signing in.
           </p>
 
           <button
@@ -130,7 +130,7 @@ function AuthScreen({ busy, error, onGoogleSignIn, onGuest }) {
           {!firebaseAuthConfigured && (
             <div className="auth-config-note" role="note">
               <strong>Google sign-in setup is pending</strong>
-              <span>You can continue to the complete assignment demo below.</span>
+              <span>You can enter as a guest and explore the complete workflow below.</span>
             </div>
           )}
 
@@ -139,7 +139,7 @@ function AuthScreen({ busy, error, onGoogleSignIn, onGuest }) {
           <div className="auth-divider"><span>or</span></div>
 
           <button className="guest-auth-button" disabled={busy} onClick={onGuest} type="button">
-            Continue to assignment demo <ArrowRight size={16} />
+            Enter as guest <ArrowRight size={16} />
           </button>
 
           <p className="auth-privacy">

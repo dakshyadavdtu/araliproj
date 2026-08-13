@@ -31,7 +31,7 @@ Adopted:
 - use Firebase's browser-local persistence and `onAuthStateChanged` as the session source of truth;
 - retain only a sanitized display profile in application state;
 - sign out through Firebase and keep local sequence data scoped by Firebase UID;
-- provide a clearly labeled assignment-demo route so the prototype remains directly reviewable with or without Firebase configuration.
+- provide a clearly labeled guest route so the prototype remains directly reviewable with or without Firebase configuration.
 
 Deliberately not treated as production authentication:
 
