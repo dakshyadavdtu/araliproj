@@ -16,6 +16,12 @@ No Firebase project or Google account is required to review the assignment.
 4. Open **Preview** to read the sequence as a plain-language journey.
 5. Save, reload, and confirm that the account-scoped browser draft is restored.
 
+## Workflow video
+
+[![Watch the complete Sequence Builder workflow demo](./screenshots/workflow-editor.png)](./screenshots/workflow-demo.mp4)
+
+**[▶ Watch the 28-second product walkthrough](./screenshots/workflow-demo.mp4)** — entry, contextual step insertion, validation, email configuration, preview, save and reload, and the responsive mobile editor.
+
 ## Screenshots
 
 ![Desktop sequence editor showing an ordered workflow and scheduler settings](./screenshots/workflow-editor.png)
