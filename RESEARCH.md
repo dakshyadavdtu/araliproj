@@ -20,23 +20,23 @@ The assignment was compared with established workflow products to identify usefu
 - Use one validation model for card status, overall readiness, and preview. “Ready” should mean the same thing everywhere.
 - Treat preview and persistence as authoring features only. Real execution, recipient state, events, and retry behavior belong on a backend.
 
-## Google Identity Services
+## Firebase Authentication with Google
 
-The integration follows Google’s official guidance for [creating a Web client and configuring Authorized JavaScript origins](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid) and [rendering the official button with the JavaScript API](https://developers.google.com/identity/gsi/web/guides/display-button).
+The integration follows Firebase's official guidance for [setting up a Web app](https://firebase.google.com/docs/web/setup), [authenticating with Google](https://firebase.google.com/docs/auth/web/google-signin), and [observing authentication state](https://firebase.google.com/docs/auth/web/start).
 
 Adopted:
 
-- load `https://accounts.google.com/gsi/client` dynamically;
-- render Google’s button with `google.accounts.id.renderButton` rather than imitating it;
-- handle the returned credential only inside the callback;
-- retain only a sanitized display profile for the browser session;
-- clear the profile and call `disableAutoSelect` on sign-out;
-- provide a clearly labeled guest preview only when the client ID is not configured.
+- initialize Firebase only when every required environment value is present;
+- open Google's account picker through `GoogleAuthProvider` and `signInWithPopup`;
+- use Firebase's browser-local persistence and `onAuthStateChanged` as the session source of truth;
+- retain only a sanitized display profile in application state;
+- sign out through Firebase and keep local sequence data scoped by Firebase UID;
+- provide a clearly labeled assignment-demo route so the prototype remains directly reviewable with or without Firebase configuration.
 
 Deliberately not treated as production authentication:
 
-- Decoding a JWT payload in the browser does not verify it.
-- The credential is not stored, and the guest route does not claim to authenticate a user.
-- A production service must send the ID token to its backend and verify signature, `aud`, `iss`, and `exp` before creating a session, as required by Google’s [server-side verification guide](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
+- A client session alone does not authorize access to a future application backend.
+- Application code never manually persists an OAuth credential; Firebase SDK intentionally owns the authenticated session through browser-local persistence. The guest route does not claim to authenticate a user.
+- A production service must receive the Firebase ID token over HTTPS and [verify it with the Firebase Admin SDK](https://firebase.google.com/docs/auth/admin/verify-id-tokens) before creating or authorizing a server session.
 
-One Tap, automatic sign-in, account linking, domain restriction, and OAuth scopes were not needed for this assignment. The app requests identity for entry only; it does not request access to Google APIs.
+Redirect sign-in, account linking, organization restrictions, and extra Google API scopes were not needed for this assignment. The app requests identity for entry only; it does not request access to Google APIs.

@@ -1,18 +1,36 @@
 # Workflow Sequence Builder
 
-A focused React prototype for composing a small customer email sequence. A user can add and order steps, configure each step in a side editor, review readiness, preview the resulting sequence in plain language, and save the draft in the browser.
+A focused React application for composing a customer email sequence. It turns the assignment's four required building blocks into a clear authoring flow: add steps, put them in order, configure each one, resolve incomplete work, preview the result in plain language, and save it in the browser.
 
-The source is JavaScript and JSX. There is no TypeScript or backend in this submission.
+The source is JavaScript and JSX. There is no TypeScript, custom application backend, or workflow execution service in this submission.
 
 **Live demo:** [dakshyadavdtu.github.io/araliproj](https://dakshyadavdtu.github.io/araliproj/)
 
+## Review in 60 seconds
+
+No Firebase project or Google account is required to review the assignment.
+
+1. Open the live demo and choose **Continue to assignment demo**.
+2. Select **Load example** if the editor is empty. A prior guest save may be restored in the same browser instead.
+3. Select any step, change a field, and use **Apply changes**.
+4. Open **Preview** to read the sequence as a plain-language journey.
+5. Save, reload, and confirm that the account-scoped browser draft is restored.
+
 ## Screenshots
 
-![Desktop sequence editor showing an ordered workflow and scheduler settings](./screenshots/workflow-editor.jpg)
+![Desktop sequence editor showing an ordered workflow and scheduler settings](./screenshots/workflow-editor.png)
 
 *Desktop: the ordered workflow remains visible while the selected scheduler is edited in the right-hand inspector.*
 
-![Mobile scheduler editor with frequency, time, and timezone fields](./screenshots/mobile-editor.jpg)
+![Sign-in screen with Google authentication and assignment demo access](./screenshots/sign-in.png)
+
+*Entry: Firebase Google sign-in is ready to use when project credentials are supplied, while the clearly labeled demo route keeps the assignment reviewable without credentials.*
+
+![Mobile sequence editor with ordered step controls](./screenshots/mobile-workflow.png)
+
+*Mobile: the same workflow remains usable without horizontal scrolling; reorder and delete controls stay available on every step.*
+
+![Mobile scheduler editor with frequency, time, and timezone fields](./screenshots/mobile-editor.png)
 
 *Mobile: step settings move into a full-width panel with persistent Cancel and Apply actions.*
 
@@ -31,7 +49,8 @@ The source is JavaScript and JSX. There is no TypeScript or backend in this subm
 - Schema-versioned `localStorage` persistence with defensive parsing.
 - Responsive desktop, tablet, and mobile layouts, including a mobile slide-over editor.
 - Keyboard-visible focus styles, semantic form labels, accessible button names, dialog roles, status announcements, Escape handling, and reduced-motion support.
-- Google Identity Services sign-in when configured, plus clearly identified guest preview access when it is not.
+- Firebase Authentication with Google sign-in when configured, plus clearly identified assignment-demo access for reviewers.
+- Account-scoped browser storage, with local sequence records keyed by Firebase UID so accounts do not share the app's saved draft.
 
 This prototype configures and previews a sequence; it does not schedule or send real email.
 
@@ -40,6 +59,7 @@ This prototype configures and previews a sequence; it does not schedule or send 
 - React 19 and React DOM
 - Vite 8
 - Redux Toolkit and React Redux
+- Firebase Authentication
 - JavaScript and JSX
 - Lucide React icons
 - Vitest, jsdom, Testing Library, and `user-event`
@@ -57,7 +77,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. Google configuration is optional for assignment review: if `VITE_GOOGLE_CLIENT_ID` is absent, the entry screen offers **Preview the demo**.
+Open the local URL printed by Vite. Firebase configuration is optional for assignment review: when it is absent, the entry screen explains that Google sign-in is unavailable and offers **Continue to assignment demo**.
 
 Useful commands:
 
@@ -70,35 +90,41 @@ npm run test:watch # run tests in watch mode
 npm run lint       # lint src/ and vite.config.js
 ```
 
-## Google Identity setup
+## Firebase Google sign-in
 
-The app dynamically loads the official Google Identity Services client and asks it to render the Google button. To enable it locally:
+The sign-in flow uses Firebase Authentication's Google provider. The application observes the Firebase session, opens the official Google account picker, keeps the session in browser-local persistence, and signs out through Firebase. To connect your own Firebase project:
 
-1. In Google Cloud, create or select an OAuth 2.0 client with application type **Web application**.
-2. Configure the consent screen and add the exact browser origins you will use under **Authorized JavaScript origins**. For the default Vite server, add both `http://localhost` and `http://localhost:5173`. Add the exact production origin separately when deploying.
-3. Create a local environment file:
+1. Create a Firebase project, register a Web app, and copy its Firebase configuration values.
+2. In **Authentication → Sign-in method**, enable the **Google** provider.
+3. In **Authentication → Settings → Authorized domains**, include `localhost` for local development and `dakshyadavdtu.github.io` for the live GitHub Pages build.
+4. Create a local environment file:
 
    ```bash
    cp .env.example .env.local
    ```
 
-4. Replace the example value with the Web client ID:
+5. Replace every required placeholder with the matching Web app value:
 
    ```dotenv
-   VITE_GOOGLE_CLIENT_ID=1234567890-example.apps.googleusercontent.com
+   VITE_FIREBASE_API_KEY=your-api-key
+   VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+   VITE_FIREBASE_PROJECT_ID=your-project
+   VITE_FIREBASE_STORAGE_BUCKET=your-project.firebasestorage.app
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+   VITE_FIREBASE_APP_ID=your-web-app-id
    ```
 
-5. Restart the Vite server after changing the environment file.
+6. Restart the Vite server after changing the environment file.
 
-The client ID is public configuration; do not add an OAuth client secret to a Vite environment variable. The `.env.local` file is ignored by Git.
+For the GitHub Pages build, add the same names as GitHub repository **Variables** under **Settings → Secrets and variables → Actions → Variables**. The deployment workflow passes those values only to the Vite build. Firebase Web configuration identifies the Firebase project; it is not a private server secret. Even so, local `.env` files are ignored so environment-specific values do not become repository noise.
 
-When no client ID is configured, **Preview the demo** opens the editor as a guest. It is a review route, not a simulated Google sign-in. When Google is configured, the browser callback decodes only basic profile fields for display, stores the sanitized profile in `sessionStorage`, and never persists the credential. Sign-out clears that profile and disables Google auto-selection.
+When Firebase is not configured, **Continue to assignment demo** opens the complete editor as a guest. It is a review route, not a simulated sign-in. When Firebase is configured, its SDK owns the authenticated session and the app retains only a sanitized display profile in React state. The user's Firebase UID also scopes the local sequence record.
 
-Client-side decoding is not authentication for a production system. A real application must send the ID token to a trusted backend and verify its signature, audience, issuer, and expiry before creating an application session. See the [Google Identity Services setup guide](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid) and [server-side ID-token verification guide](https://developers.google.com/identity/gsi/web/guides/verify-google-id-token).
+The implementation follows Firebase's official [Web setup guide](https://firebase.google.com/docs/web/setup), [Google sign-in guide](https://firebase.google.com/docs/auth/web/google-signin), and [authentication state guidance](https://firebase.google.com/docs/auth/web/start). A future server must still [verify Firebase ID tokens with the Admin SDK](https://firebase.google.com/docs/auth/admin/verify-id-tokens) before trusting the user for backend data or actions.
 
 ## Suggested review flow
 
-1. Open the live demo, or run the app without a Google client ID and choose **Preview the demo**.
+1. Open the live demo, or run the app without Firebase values and choose **Continue to assignment demo**.
 2. From the empty builder, add a Scheduler and apply its frequency, time, and timezone.
 3. Add Enrollment and enter a contact name and valid email address.
 4. Add an Exit condition, then add Send email and apply it with the subject or body empty. The card remains **Needs attention** and the editor explains what is missing.
@@ -109,6 +135,15 @@ Client-side decoding is not authentication for a production system. A real appli
 
 For a shorter tour, **Load example** creates a complete five-step sequence with two emails; it is optional and the editor does not depend on it.
 
+## UI decisions
+
+- **A vertical sequence instead of a graph canvas.** The assignment is an ordered flow with four bounded step types, so a readable list makes order and completion state clearer than pan-and-zoom controls.
+- **Configuration stays beside the sequence.** On desktop, selecting a card opens its form in a persistent inspector without hiding the workflow. On smaller screens, the same form becomes a focused, keyboard-managed panel.
+- **Adding is contextual.** Plus controls appear between steps and at the end, so a reviewer can insert at the intended position instead of adding and then repairing the order.
+- **Drafts are deliberate.** Form typing remains local until **Apply changes**. Leaving a changed draft, signing out, or closing the page prompts before work is lost; stale draft data can never be reported as saved.
+- **Readiness is consistent.** Cards, the progress summary, the preview, and save flow all use the same validation model. An incomplete step therefore means the same thing everywhere.
+- **The demo is honest.** Google sign-in is a real Firebase integration when configured. Without credentials the product says so and exposes a separate reviewer route rather than pretending authentication succeeded.
+
 ## Structure and architecture
 
 The application deliberately keeps a flat `src/` structure because the feature set is small:
@@ -117,14 +152,16 @@ The application deliberately keeps a flat `src/` structure because the feature s
 src/
 ├── main.jsx          React root and Redux Provider
 ├── App.jsx           authentication-to-builder boundary
-├── AuthGate.jsx      Google Identity Services and guest entry
+├── AuthGate.jsx      Firebase session boundary and assignment-demo entry
+├── firebase.js       Firebase setup, Google provider, and profile sanitizing
 ├── Builder.jsx       page orchestration, commands, and transient UI state
 ├── Workflow.jsx      ordered workflow, cards, and add controls
 ├── Editor.jsx        local step drafts and type-specific fields
 ├── Dialogs.jsx       preview, deletion, and discard dialogs
 ├── store.js          Redux slice, actions, selectors, and store factory
 ├── workflow.js       data model, rules, validation, summaries, and persistence
-├── workflow.test.js  domain, reducer, persistence, and interaction tests
+├── workflow.test.js  domain, reducer, persistence, and builder tests
+├── AuthGate.test.jsx Firebase sign-in, sign-out, and error-state tests
 └── styles.css        visual system and responsive behavior
 ```
 
@@ -164,9 +201,9 @@ The same rules drive inline errors, card status, progress, and preview readiness
 
 ### Browser persistence
 
-Saving writes a versioned record to `localStorage` under `arali.sequence-builder.v1`. The record contains `version`, `savedAt`, and the sequence snapshot. Loading rejects malformed JSON, unknown schema versions, unsupported node shapes, duplicate IDs, invalid dates, and node-limit violations; the app falls back to a new empty sequence instead of partially hydrating bad data.
+Saving writes a versioned record to `localStorage` under an account-scoped key derived from `arali.sequence-builder.v1`. The record contains `version`, `savedAt`, and the sequence snapshot. Loading rejects malformed JSON, unknown schema versions, unsupported node shapes, duplicate IDs, invalid dates, and node-limit violations; the app falls back to a new empty sequence instead of partially hydrating bad data.
 
-Saving is explicit rather than automatic. Redux retains a cloned saved snapshot and derives dirty state by comparing the editable sequence with that snapshot. Google display profile data is separate and session-scoped in `sessionStorage`; no Google credential is stored.
+Saving is explicit rather than automatic. Redux retains a cloned saved snapshot and derives dirty state by comparing the editable sequence with that snapshot. Guest entry lasts for the browser tab in `sessionStorage`; authenticated session persistence is managed by Firebase. The application never stores a Google credential itself.
 
 ## Production backend approach
 
@@ -202,7 +239,7 @@ The UI model is intentionally small, but it maps to a service architecture witho
 ### API outline
 
 ```text
-POST   /auth/google                         verify ID token; create application session
+POST   /auth/session                        verify Firebase ID token; create application session
 GET    /sequences                          list definitions
 POST   /sequences                          create a draft
 GET    /sequences/:id                      fetch draft and published metadata
@@ -220,23 +257,25 @@ Mutating endpoints would require an authenticated application session, authoriza
 
 ## Testing
 
-The test suite uses Vitest with jsdom and Testing Library. The current 10 tests cover:
+The test suite uses Vitest with jsdom and Testing Library. The current 17 tests across two focused files cover:
 
 - required steps, node field rules, summaries, and the generated narrative;
 - reducer enforcement of node limits, reordering, deletion selection, and dirty state;
-- schema-versioned persistence and safe fallback for malformed or incompatible data;
-- guest review entry, loading the example, and cancelling an editor draft without mutating the applied workflow.
+- schema-versioned, account-scoped persistence and safe fallback for malformed or incompatible data;
+- guest review entry, loading the example, cancelling drafts, saving, and reloading;
+- incomplete-preview guidance, unapplied-draft save protection, and draft safety around deletion;
+- configured Firebase Google sign-in, Firebase sign-out, and useful authentication errors.
 
-Run it with `npm test`. The latest local run completed with 1 test file and all 10 tests passing. `npm run lint` checks the JavaScript/JSX source and Vite configuration. The highest-value next test layer would be browser-level coverage for Google callback handling, keyboard navigation, responsive dialogs, save/reload behavior, and accessibility checks.
+Run it with `npm test`. `npm run lint` checks the JavaScript/JSX source and Vite configuration, while `npm run build` produces the exact Pages artifact. Every push to `main` repeats all three checks before deployment.
 
-## Tradeoffs and next steps
+## Assumptions, tradeoffs, and next steps
 
 - An ordered list is clearer for this four-node assignment than an infinite graph canvas, but it cannot express branches or parallel work.
 - Arrow controls are predictable and keyboard-accessible; drag-and-drop and undo/redo would improve longer workflows.
 - The node catalog, one enrolled contact, plain-text email, and fixed limits keep configuration understandable but are not a general automation platform.
 - Explicit local save makes persistence visible, but it has no cross-device sync, collaboration, revision history, or conflict handling.
 - The scheduler and email nodes are configuration only. Production needs the versioned backend, event ingestion, durable queue, provider integration, observability, and retry model outlined above.
-- The Google callback supports a review experience, not backend authorization. Production should exchange the ID token for an HTTP-only application session after server verification.
+- Firebase provides a real client authentication session, but this static prototype has no application backend or server authorization. A production service should exchange the Firebase ID token for an HTTP-only application session after Admin SDK verification.
 - Useful extensions include branching, delay nodes, reusable templates and variables, contact/segment selection, per-step execution history, import/export, end-to-end tests, and automated accessibility testing.
 
 Product references and the decisions taken from them are documented in [RESEARCH.md](./RESEARCH.md).
