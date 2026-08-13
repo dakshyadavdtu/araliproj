@@ -197,6 +197,7 @@ export default function Workflow({
   onSelect,
   onLoadExample,
 }) {
+  const firstStepTriggerRef = useRef(null)
   const progress = validation.totalCount
     ? Math.round((validation.readyCount / validation.totalCount) * 100)
     : 0
@@ -245,6 +246,7 @@ export default function Workflow({
                     aria-expanded={pickerIndex === 0}
                     className="btn btn-primary"
                     onClick={() => onPickerChange(pickerIndex === 0 ? null : 0)}
+                    ref={firstStepTriggerRef}
                     type="button"
                   >
                     <Plus size={16} /> Add first step
@@ -256,7 +258,10 @@ export default function Workflow({
                         onAdd(type, 0)
                         onPickerChange(null)
                       }}
-                      onClose={() => onPickerChange(null)}
+                      onClose={() => {
+                        onPickerChange(null)
+                        window.requestAnimationFrame(() => firstStepTriggerRef.current?.focus())
+                      }}
                     />
                   )}
                 </div>

@@ -1748,7 +1748,7 @@ textarea {
   color: #a9d5c3;
 }
 
-.auth-showcase__copy h1 {
+.auth-showcase__copy h2 {
   max-width: 650px;
   margin: 0;
   font-size: clamp(32px, 3.2vw, 44px);
@@ -1916,7 +1916,7 @@ textarea {
   text-transform: uppercase;
 }
 
-.auth-card h2 {
+.auth-card h1 {
   margin: 0;
   font-size: 31px;
   letter-spacing: -.035em;
@@ -2055,7 +2055,7 @@ textarea {
 
   .auth-preview { max-width: 520px; }
 
-  .auth-showcase__copy h1 {
+  .auth-showcase__copy h2 {
     font-size: clamp(36px, 4.2vw, 54px);
   }
 }
@@ -2092,6 +2092,6 @@ textarea {
   .account-control { padding-left: 4px; }
   .account-control img,
   .account-avatar { display: none; }
-  .auth-card h2 { font-size: 27px; }
+  .auth-card h1 { font-size: 27px; }
   .auth-card__icon { margin-bottom: 18px; }
 }

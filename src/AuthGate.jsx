@@ -94,7 +94,7 @@ function AuthScreen({ busy, error, onGoogleSignIn, onGuest }) {
         </div>
         <div className="auth-showcase__copy">
           <p className="eyebrow">Workflow sequence builder</p>
-          <h1>Turn a thoughtful follow-up into a clear, dependable flow.</h1>
+          <h2>Turn a thoughtful follow-up into a clear, dependable flow.</h2>
           <p>
             Build an outreach sequence step by step, keep every setting understandable,
             and catch incomplete work before it is ready to run.
@@ -112,7 +112,7 @@ function AuthScreen({ busy, error, onGoogleSignIn, onGuest }) {
         <div className="auth-card">
           <span className="auth-card__icon"><ShieldCheck size={22} /></span>
           <p className="auth-card__eyebrow">Secure workspace</p>
-          <h2 id="auth-title">Welcome to Sequences</h2>
+          <h1 id="auth-title">Welcome to Sequences</h1>
           <p className="auth-card__intro">
             Continue with your Google account, or enter the assignment demo without signing in.
           </p>

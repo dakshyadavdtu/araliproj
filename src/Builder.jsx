@@ -251,9 +251,10 @@ export default function Builder({ account, accountId, onLeave }) {
 
         {mobileEditorOpen && selected && (
           <button
-            aria-label="Close step editor"
+            aria-hidden="true"
             className="mobile-inspector-backdrop"
             onClick={() => setMobileEditorOpen(false)}
+            tabIndex={-1}
             type="button"
           />
         )}
