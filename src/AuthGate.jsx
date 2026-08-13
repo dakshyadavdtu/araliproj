@@ -1,272 +1,258 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ArrowRight,
+  CalendarClock,
+  Check,
+  GitBranch,
+  Mail,
+  Send,
+  ShieldCheck,
+  UserPlus,
+} from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  firebaseAuthConfigured,
+  getAuthErrorMessage,
+  observeFirebaseUser,
+  profileFromFirebaseUser,
+  signInWithGoogle,
+  signOutOfFirebase,
+} from './firebase.js'
 
-const GOOGLE_IDENTITY_SCRIPT = 'https://accounts.google.com/gsi/client'
-const GOOGLE_SCRIPT_ID = 'google-identity-services'
-const PROFILE_STORAGE_KEY = 'sequence-builder.google-profile'
-
-let googleIdentityPromise;
-
-function loadGoogleIdentityServices() {
-  if (window.google?.accounts?.id) {
-    return Promise.resolve(window.google.accounts.id);
-  }
-
-  if (googleIdentityPromise) {
-    return googleIdentityPromise;
-  }
-
-  googleIdentityPromise = new Promise((resolve, reject) => {
-    const existingScript = document.getElementById(GOOGLE_SCRIPT_ID);
-    const script = existingScript ?? document.createElement("script");
-
-    const handleLoad = () => {
-      if (window.google?.accounts?.id) {
-        resolve(window.google.accounts.id);
-        return;
-      }
-
-      reject(new Error("Google Identity Services loaded without its browser API."));
-    };
-    const handleError = () => {
-      reject(new Error("Google Identity Services could not be loaded."));
-    };
-
-    script.addEventListener("load", handleLoad, { once: true });
-    script.addEventListener("error", handleError, { once: true });
-
-    if (!existingScript) {
-      script.id = GOOGLE_SCRIPT_ID;
-      script.src = GOOGLE_IDENTITY_SCRIPT;
-      script.async = true;
-      script.defer = true;
-      document.head.appendChild(script);
-    }
-  }).catch((error) => {
-    googleIdentityPromise = undefined;
-    throw error;
-  });
-
-  return googleIdentityPromise;
+const GUEST_SESSION_KEY = 'arali.sequence-builder.guest'
+const guestProfile = {
+  id: 'guest-reviewer',
+  name: 'Guest reviewer',
+  email: '',
+  picture: '',
 }
 
-function cleanText(value, maximumLength) {
-  return typeof value === "string" ? value.trim().slice(0, maximumLength) : "";
-}
-
-function cleanPictureUrl(value) {
-  if (typeof value !== "string") return "";
-
+function readGuestSession() {
   try {
-    const url = new URL(value);
-    return url.protocol === "https:" ? url.toString().slice(0, 2048) : "";
+    return window.sessionStorage.getItem(GUEST_SESSION_KEY) === 'active'
   } catch {
-    return "";
+    return false
   }
 }
 
-function sanitizeProfile(value) {
-  if (!value || typeof value !== "object") return null;
-
-  const id = cleanText(value.sub ?? value.id, 160);
-  const email = cleanText(value.email, 254);
-  const name = cleanText(value.name, 120);
-
-  if (!id || (!email && !name)) return null;
-
-  return {
-    id,
-    name: name || email,
-    email,
-    givenName: cleanText(value.given_name ?? value.givenName, 80),
-    familyName: cleanText(value.family_name ?? value.familyName, 80),
-    picture: cleanPictureUrl(value.picture),
-  };
-}
-
-function decodeGoogleProfile(credential) {
-  if (typeof credential !== "string") return null;
-
-  const encodedPayload = credential.split(".")[1];
-  if (!encodedPayload) return null;
-
+function setGuestSession(active) {
   try {
-    const base64 = encodedPayload.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
-    const binary = window.atob(padded);
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-    const payload = JSON.parse(new TextDecoder().decode(bytes));
-
-    return sanitizeProfile(payload);
+    if (active) window.sessionStorage.setItem(GUEST_SESSION_KEY, 'active')
+    else window.sessionStorage.removeItem(GUEST_SESSION_KEY)
   } catch {
-    return null;
+    // Guest review still works in memory when session storage is unavailable.
   }
 }
 
-function readStoredProfile() {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const storedValue = window.sessionStorage.getItem(PROFILE_STORAGE_KEY);
-    return storedValue ? sanitizeProfile(JSON.parse(storedValue)) : null;
-  } catch {
-    return null;
-  }
+function GoogleLogo() {
+  return (
+    <svg aria-hidden="true" className="google-logo" viewBox="0 0 24 24">
+      <path d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.33 2.98-7.41Z" fill="#4285F4" />
+      <path d="M12 22c2.7 0 4.98-.9 6.63-2.42l-3.24-2.54c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z" fill="#34A853" />
+      <path d="M6.39 13.87A6.02 6.02 0 0 1 6.08 12c0-.65.11-1.28.31-1.87V7.51H3.04A10 10 0 0 0 2 12c0 1.61.39 3.14 1.04 4.49l3.35-2.62Z" fill="#FBBC05" />
+      <path d="M12 6c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.62 9.62 0 0 0 12 2a10 10 0 0 0-8.96 5.51l3.35 2.62C7.18 7.76 9.39 6 12 6Z" fill="#EA4335" />
+    </svg>
+  )
 }
 
-function storeProfile(profile) {
-  try {
-    window.sessionStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
-  } catch {
-    // The in-memory session still works when browser storage is unavailable.
-  }
+const previewSteps = [
+  [CalendarClock, 'Scheduler', 'Every weekday at 9:00 AM', 'scheduler'],
+  [UserPlus, 'Enrollment', 'Enroll Alex Morgan', 'enrollment'],
+  [GitBranch, 'Exit condition', 'Leave when they reply', 'exit'],
+  [Mail, 'Send email', 'Send “Welcome to Acme”', 'email'],
+]
+
+function ProductPreview() {
+  return (
+    <div aria-hidden="true" className="auth-preview">
+      <div className="auth-preview__top">
+        <span>Welcome sequence</span>
+        <span className="auth-preview__ready"><Check size={12} /> Ready</span>
+      </div>
+      <div className="auth-preview__flow">
+        {previewSteps.map(([Icon, label, summary, type], index) => (
+          <div className="auth-preview__step-wrap" key={label}>
+            <div className="auth-preview__step" data-node-type={type}>
+              <span><Icon size={16} /></span>
+              <div><small>{label}</small><strong>{summary}</strong></div>
+              <Check size={14} />
+            </div>
+            {index < previewSteps.length - 1 && <span className="auth-preview__line" />}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
-function clearStoredProfile() {
-  try {
-    window.sessionStorage.removeItem(PROFILE_STORAGE_KEY);
-  } catch {
-    // There is nothing else to clear when browser storage is unavailable.
-  }
+function AuthScreen({ busy, error, onGoogleSignIn, onGuest }) {
+  return (
+    <main className="auth-gate">
+      <section className="auth-showcase" aria-label="Sequence Builder overview">
+        <div className="auth-brand">
+          <span className="brand-mark"><Send size={18} /></span>
+          <span><small>Workspace</small><strong>Sequences</strong></span>
+        </div>
+        <div className="auth-showcase__copy">
+          <p className="eyebrow">Workflow sequence builder</p>
+          <h1>Turn a thoughtful follow-up into a clear, dependable flow.</h1>
+          <p>
+            Build an outreach sequence step by step, keep every setting understandable,
+            and catch incomplete work before it is ready to run.
+          </p>
+        </div>
+        <ProductPreview />
+        <div className="auth-proof">
+          <span><Check size={14} /> Guided setup</span>
+          <span><Check size={14} /> Local drafts</span>
+          <span><Check size={14} /> Clear validation</span>
+        </div>
+      </section>
+
+      <section className="auth-panel" aria-labelledby="auth-title">
+        <div className="auth-card">
+          <span className="auth-card__icon"><ShieldCheck size={22} /></span>
+          <p className="auth-card__eyebrow">Secure workspace</p>
+          <h2 id="auth-title">Welcome to Sequences</h2>
+          <p className="auth-card__intro">
+            Continue with your Google account, or enter the assignment demo without signing in.
+          </p>
+
+          <button
+            className="google-auth-button"
+            disabled={busy}
+            onClick={onGoogleSignIn}
+            type="button"
+          >
+            {busy ? <span className="button-spinner" /> : <GoogleLogo />}
+            <span>{busy ? 'Connecting to Google…' : 'Continue with Google'}</span>
+          </button>
+
+          {!firebaseAuthConfigured && (
+            <div className="auth-config-note" role="note">
+              <strong>Google sign-in setup is pending</strong>
+              <span>You can continue to the complete assignment demo below.</span>
+            </div>
+          )}
+
+          {error && <p className="auth-error" role="alert">{error}</p>}
+
+          <div className="auth-divider"><span>or</span></div>
+
+          <button className="guest-auth-button" disabled={busy} onClick={onGuest} type="button">
+            Continue to assignment demo <ArrowRight size={16} />
+          </button>
+
+          <p className="auth-privacy">
+            <ShieldCheck size={14} /> Google sessions are managed by Firebase Authentication.
+            Guest mode stores only the sequence draft in this browser.
+          </p>
+        </div>
+      </section>
+    </main>
+  )
 }
 
 export default function AuthGate({ children }) {
-  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
-  const googleButtonRef = useRef(null);
-  const [profile, setProfile] = useState(readStoredProfile);
-  const [authMode, setAuthMode] = useState(() => profile ? "google" : null);
-  const [scriptState, setScriptState] = useState(clientId ? "loading" : "unconfigured");
-  const [authError, setAuthError] = useState("");
-  const [loadAttempt, setLoadAttempt] = useState(0);
-
-  const handleGoogleCredential = useCallback((response) => {
-    const nextProfile = decodeGoogleProfile(response?.credential);
-
-    if (!nextProfile) {
-      setAuthError("Google returned an unreadable profile. Please try again.");
-      return;
-    }
-
-    // The short-lived credential is deliberately never put in state or storage.
-    storeProfile(nextProfile);
-    setProfile(nextProfile);
-    setAuthMode("google");
-    setAuthError("");
-  }, []);
+  const [firebaseUser, setFirebaseUser] = useState(null)
+  const [guest, setGuest] = useState(readGuestSession)
+  const [checkingSession, setCheckingSession] = useState(firebaseAuthConfigured)
+  const [signingIn, setSigningIn] = useState(false)
+  const [authError, setAuthError] = useState('')
 
   useEffect(() => {
-    if (!clientId) return undefined;
+    if (!firebaseAuthConfigured) return undefined
 
-    let active = true;
-    setScriptState("loading");
-    setAuthError("");
+    let active = true
+    let unsubscribe
 
-    loadGoogleIdentityServices()
-      .then((googleIdentity) => {
-        if (!active) return;
-
-        googleIdentity.initialize({
-          client_id: clientId,
-          callback: handleGoogleCredential,
-          auto_select: false,
-          cancel_on_tap_outside: true,
-        });
-
-        if (googleButtonRef.current) {
-          googleButtonRef.current.replaceChildren();
-          googleIdentity.renderButton(googleButtonRef.current, {
-            type: "standard",
-            theme: "outline",
-            size: "large",
-            shape: "rectangular",
-            text: "continue_with",
-            width: 300,
-          });
+    observeFirebaseUser(
+      (user) => {
+        if (!active) return
+        setFirebaseUser(user)
+        setCheckingSession(false)
+        if (user) {
+          setGuest(false)
+          setGuestSession(false)
         }
-
-        setScriptState("ready");
-      })
-      .catch(() => {
-        if (!active) return;
-        setScriptState("error");
-        setAuthError("Google sign-in is temporarily unavailable. Please retry.");
-      });
+      },
+      (error) => {
+        if (!active) return
+        setAuthError(getAuthErrorMessage(error))
+        setCheckingSession(false)
+      },
+    ).then((stopObserving) => {
+      if (active) unsubscribe = stopObserving
+      else stopObserving()
+    }).catch((error) => {
+      if (!active) return
+      setAuthError(getAuthErrorMessage(error))
+      setCheckingSession(false)
+    })
 
     return () => {
-      active = false;
-    };
-  }, [clientId, handleGoogleCredential, loadAttempt]);
+      active = false
+      unsubscribe?.()
+    }
+  }, [])
 
-  const signOut = useCallback(() => {
-    window.google?.accounts?.id?.disableAutoSelect();
-    clearStoredProfile();
-    setProfile(null);
-    setAuthMode(null);
-    setAuthError("");
-  }, []);
+  const startGoogleSignIn = useCallback(async () => {
+    setAuthError('')
 
-  if (authMode) {
-    if (typeof children === "function") {
-      return children({
-        profile,
-        authMode,
-        isGuest: authMode === "guest",
-        signOut,
-      });
+    if (!firebaseAuthConfigured) {
+      setAuthError(getAuthErrorMessage({ code: 'auth/missing-config' }))
+      return
     }
 
-    return children;
+    setSigningIn(true)
+    try {
+      const result = await signInWithGoogle()
+      setFirebaseUser(result.user)
+      setGuest(false)
+      setGuestSession(false)
+    } catch (error) {
+      setAuthError(getAuthErrorMessage(error))
+    } finally {
+      setSigningIn(false)
+    }
+  }, [])
+
+  const continueAsGuest = useCallback(() => {
+    setGuestSession(true)
+    setGuest(true)
+    setAuthError('')
+  }, [])
+
+  const leaveWorkspace = useCallback(async () => {
+    setAuthError('')
+    if (firebaseUser && firebaseAuthConfigured) {
+      try {
+        await signOutOfFirebase()
+      } catch (error) {
+        setAuthError(getAuthErrorMessage(error))
+        return
+      }
+    }
+    setFirebaseUser(null)
+    setGuest(false)
+    setGuestSession(false)
+  }, [firebaseUser])
+
+  const firebaseProfile = profileFromFirebaseUser(firebaseUser)
+  const profile = firebaseProfile || (guest ? guestProfile : null)
+  const authMode = firebaseProfile ? 'firebase' : guest ? 'guest' : null
+
+  if (profile && authMode) {
+    return typeof children === 'function'
+      ? children({ profile, authMode, isGuest: authMode === 'guest', signOut: leaveWorkspace })
+      : children
   }
 
   return (
-    <main className="auth-gate">
-      <section className="auth-gate__card" aria-labelledby="auth-gate-title">
-        <div className="auth-gate__mark" aria-hidden="true">S</div>
-        <p className="auth-gate__eyebrow">Sequence workspace</p>
-        <h1 id="auth-gate-title">Sign in to build your sequence</h1>
-        <p className="auth-gate__intro">
-          Continue with Google to open the workflow editor for this browser session.
-        </p>
-
-        {clientId ? (
-          <div className="auth-gate__google">
-            <div ref={googleButtonRef} />
-            {scriptState === "loading" ? (
-              <p className="auth-gate__status" role="status">Loading secure Google sign-in…</p>
-            ) : null}
-            {scriptState === "error" ? (
-              <button
-                className="auth-gate__retry"
-                onClick={() => setLoadAttempt((attempt) => attempt + 1)}
-                type="button"
-              >
-                Retry Google sign-in
-              </button>
-            ) : null}
-          </div>
-        ) : (
-          <div className="auth-gate__demo-option">
-            <p>
-              Google sign-in is not configured in this review build. You can still inspect the
-              assignment without creating an account.
-            </p>
-            <button
-              className="auth-gate__demo-button"
-              onClick={() => setAuthMode("guest")}
-              type="button"
-            >
-              Preview the demo
-            </button>
-            <small>This is guest-only demo access, not a simulated sign-in.</small>
-          </div>
-        )}
-
-        {authError ? <p className="auth-gate__error" role="alert">{authError}</p> : null}
-
-        <p className="auth-gate__security-note">
-          This frontend decodes basic profile details for display only. In production, the Google
-          credential must be verified by a trusted backend before granting access.
-        </p>
-      </section>
-    </main>
-  );
+    <AuthScreen
+      busy={checkingSession || signingIn}
+      error={authError}
+      onGoogleSignIn={startGoogleSignIn}
+      onGuest={continueAsGuest}
+    />
+  )
 }

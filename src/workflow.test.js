@@ -2,7 +2,7 @@
 
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Provider } from 'react-redux'
 import { describe, expect, it } from 'vitest'
@@ -14,6 +14,7 @@ import {
   createSampleSequence,
   getNodeSummary,
   getSequenceNarrative,
+  getStorageKey,
   loadSequence,
   saveSequence,
   STORAGE_KEY,
@@ -40,9 +41,19 @@ afterEach(() => {
   window.sessionStorage.clear()
 })
 
+if (!window.matchMedia) {
+  window.matchMedia = () => ({
+    matches: false,
+    media: '',
+    onchange: null,
+    addEventListener() {},
+    removeEventListener() {},
+  })
+}
+
 function renderApp() {
   const app = React.createElement(App)
-  render(React.createElement(Provider, { store: makeStore() }, app))
+  return render(React.createElement(Provider, { store: makeStore() }, app))
 }
 
 class MemoryStorage {
@@ -160,6 +171,17 @@ describe('local persistence', () => {
     expect(loadSequence(storage)).toEqual(saved)
   })
 
+  it('keeps locally saved sequences separate for each account', () => {
+    const storage = new MemoryStorage()
+    const sequence = createSampleSequence()
+
+    saveSequence(sequence, storage, 'user-a')
+
+    expect(getStorageKey('user-a')).toBe(`${STORAGE_KEY}.user-a`)
+    expect(loadSequence(storage, 'user-a')?.sequence.name).toBe('Acme welcome sequence')
+    expect(loadSequence(storage, 'user-b')).toBeNull()
+  })
+
   it('falls back safely when saved data is malformed or incompatible', () => {
     const storage = new MemoryStorage()
 
@@ -176,7 +198,7 @@ describe('sequence builder', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByRole('button', { name: 'Preview the demo' }))
+    await user.click(screen.getByRole('button', { name: 'Continue to assignment demo' }))
     expect(screen.getByRole('heading', { name: 'Start with your first step' })).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Load example' }))
@@ -188,7 +210,7 @@ describe('sequence builder', () => {
     const user = userEvent.setup()
     renderApp()
 
-    await user.click(screen.getByRole('button', { name: 'Preview the demo' }))
+    await user.click(screen.getByRole('button', { name: 'Continue to assignment demo' }))
     await user.click(screen.getByRole('button', { name: 'Load example' }))
     await user.click(screen.getByRole('button', {
       name: 'Edit Enrollment: Enroll Alex Morgan · alex@example.com',
@@ -203,5 +225,79 @@ describe('sequence builder', () => {
       name: 'Edit Enrollment: Enroll Alex Morgan · alex@example.com',
     })).toBeInTheDocument()
     expect(screen.queryByText('Changed draft')).not.toBeInTheDocument()
+  })
+
+  it('shows useful incomplete-step guidance in Preview', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(screen.getByRole('button', { name: 'Continue to assignment demo' }))
+    await user.click(screen.getByRole('button', { name: 'Add first step' }))
+    await user.click(screen.getByRole('button', { name: /Send email/ }))
+    await user.click(screen.getByRole('button', { name: 'Preview sequence' }))
+
+    expect(screen.getByText(/Send email needs attention/)).toBeInTheDocument()
+    expect(screen.getByText(/Add a scheduler step/)).toBeInTheDocument()
+    expect(screen.queryByText(/\[object Object\]/)).not.toBeInTheDocument()
+  })
+
+  it('does not report unapplied editor work as saved', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(screen.getByRole('button', { name: 'Continue to assignment demo' }))
+    await user.click(screen.getByRole('button', { name: 'Load example' }))
+    await user.click(screen.getByRole('button', {
+      name: 'Edit Enrollment: Enroll Alex Morgan · alex@example.com',
+    }))
+    await user.type(screen.getByRole('textbox', { name: 'Contact name *' }), ' draft')
+
+    expect(screen.getByText('Unapplied step edits')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Save sequence (Ctrl/Cmd + S)' })).toBeDisabled()
+  })
+
+  it('preserves draft protection when a different step is deleted', async () => {
+    const user = userEvent.setup()
+    renderApp()
+
+    await user.click(screen.getByRole('button', { name: 'Continue to assignment demo' }))
+    await user.click(screen.getByRole('button', { name: 'Load example' }))
+    await user.click(screen.getByRole('button', {
+      name: 'Edit Enrollment: Enroll Alex Morgan · alex@example.com',
+    }))
+    await user.type(screen.getByRole('textbox', { name: 'Contact name *' }), ' draft')
+
+    await user.click(screen.getByRole('button', { name: 'Delete Scheduler' }))
+    await user.click(screen.getByRole('button', { name: 'Delete step' }))
+    await user.click(screen.getByRole('button', {
+      name: 'Edit Exit condition: Leave when the contact replies',
+    }))
+
+    expect(screen.getByRole('heading', { name: 'Discard unapplied edits?' })).toBeInTheDocument()
+  })
+
+  it('restores an explicitly saved sequence for the same guest session', async () => {
+    const user = userEvent.setup()
+    const view = renderApp()
+
+    await user.click(screen.getByRole('button', { name: 'Continue to assignment demo' }))
+    await user.click(screen.getByRole('button', { name: 'Load example' }))
+    await user.click(screen.getByRole('button', {
+      name: 'Edit Enrollment: Enroll Alex Morgan · alex@example.com',
+    }))
+    const name = screen.getByRole('textbox', { name: 'Contact name *' })
+    await user.clear(name)
+    await user.type(name, 'Taylor Reed')
+    await user.click(screen.getByRole('button', { name: 'Apply changes' }))
+    await user.click(screen.getByRole('button', { name: 'Save sequence (Ctrl/Cmd + S)' }))
+
+    view.unmount()
+    renderApp()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', {
+        name: 'Edit Enrollment: Enroll Taylor Reed · alex@example.com',
+      })).toBeInTheDocument()
+    })
   })
 })

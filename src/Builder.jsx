@@ -1,7 +1,7 @@
 import { CheckCircle2, Eye, LogOut, Save, Send } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { DeleteDialog, DiscardDialog, PreviewDialog } from './Dialogs.jsx'
+import { DeleteDialog, DiscardDialog, LeaveDialog, PreviewDialog } from './Dialogs.jsx'
 import Editor from './Editor.jsx'
 import {
   addNode,
@@ -16,9 +16,10 @@ import {
   selectSequenceState,
   selectSequenceValidation,
   selectNode,
+  hydrateSequence,
   updateNode,
 } from './store.js'
-import { NODE_LABELS, saveSequence } from './workflow.js'
+import { createEmptySequence, loadSequence, NODE_LABELS, saveSequence } from './workflow.js'
 import Workflow from './Workflow.jsx'
 
 function savedLabel(iso) {
@@ -53,7 +54,7 @@ function AccountControl({ account, onLeave }) {
   )
 }
 
-export default function Builder({ account, onLeave }) {
+export default function Builder({ account, accountId, onLeave }) {
   const dispatch = useDispatch()
   const sequence = useSelector(selectSequence)
   const selected = useSelector(selectSelectedNode)
@@ -73,15 +74,42 @@ export default function Builder({ account, onLeave }) {
     window.setTimeout(() => setToast(''), 2200)
   }, [])
 
+  const closeEditor = useCallback(() => {
+    setDraftChanged(false)
+    setMobileEditorOpen(false)
+  }, [])
+
+  const applyEditor = useCallback((node) => {
+    dispatch(updateNode(node))
+    setDraftChanged(false)
+    setMobileEditorOpen(false)
+    showToast(`${NODE_LABELS[node.type]} updated`)
+  }, [dispatch, showToast])
+
+  useEffect(() => {
+    const saved = loadSequence(undefined, accountId)
+    dispatch(saved
+      ? hydrateSequence(saved)
+      : hydrateSequence({ sequence: createEmptySequence(), savedAt: null }))
+    setDraftChanged(false)
+    setMobileEditorOpen(false)
+    setPickerIndex(null)
+  }, [accountId, dispatch])
+
   const save = useCallback(() => {
-    const saved = saveSequence(sequence)
+    if (draftChanged) {
+      showToast('Apply or cancel the step edits before saving')
+      return
+    }
+
+    const saved = saveSequence(sequence, undefined, accountId)
     if (!saved) {
       showToast('Could not save in this browser')
       return
     }
     dispatch(markSaved({ savedAt: saved.savedAt }))
     showToast('Sequence saved')
-  }, [dispatch, sequence, showToast])
+  }, [accountId, dispatch, draftChanged, sequence, showToast])
 
   useEffect(() => {
     function handleShortcut(event) {
@@ -96,13 +124,21 @@ export default function Builder({ account, onLeave }) {
 
   useEffect(() => {
     function warnBeforeLeave(event) {
-      if (!dirty) return
+      if (!dirty && !draftChanged) return
       event.preventDefault()
       event.returnValue = ''
     }
     window.addEventListener('beforeunload', warnBeforeLeave)
     return () => window.removeEventListener('beforeunload', warnBeforeLeave)
-  }, [dirty])
+  }, [dirty, draftChanged])
+
+  useEffect(() => {
+    const title = draftChanged || dirty
+      ? 'Unsaved changes · Sequence Builder'
+      : 'Sequence Builder'
+    document.title = title
+    return () => { document.title = 'Sequence Builder' }
+  }, [dirty, draftChanged])
 
   function selectStep(nodeId) {
     if (nodeId === selectedNodeId) {
@@ -138,6 +174,15 @@ export default function Builder({ account, onLeave }) {
   }
 
   const enrollment = sequence.nodes.find((node) => node.type === 'enrollment')
+  const hasUnsavedWork = dirty || draftChanged
+
+  function requestLeave() {
+    if (hasUnsavedWork) {
+      setPendingAction({ kind: 'leave' })
+      return
+    }
+    onLeave()
+  }
 
   return (
     <main className="app-shell">
@@ -155,13 +200,20 @@ export default function Builder({ account, onLeave }) {
             onChange={(event) => dispatch(renameSequence(event.target.value))}
             value={sequence.name}
           />
+          {hasUnsavedWork && <span className="mobile-unsaved-state">Unsaved</span>}
         </div>
         <div className="topbar-actions">
           <div aria-live="polite" className="save-state">
-            <strong data-dirty={dirty}>
-              {dirty ? 'Unsaved changes' : lastSavedAt ? 'All changes saved' : 'No changes yet'}
+            <strong data-dirty={hasUnsavedWork}>
+              {draftChanged
+                ? 'Unapplied step edits'
+                : dirty
+                  ? 'Unsaved changes'
+                  : lastSavedAt
+                    ? 'All changes saved'
+                    : 'No changes yet'}
             </strong>
-            <span>{savedLabel(lastSavedAt)}</span>
+            <span>{draftChanged ? 'Apply or cancel before saving' : savedLabel(lastSavedAt)}</span>
           </div>
           <button aria-label="Preview sequence" className="btn btn-secondary" onClick={() => setPreviewOpen(true)} type="button">
             <Eye size={16} /><span>Preview</span>
@@ -169,14 +221,14 @@ export default function Builder({ account, onLeave }) {
           <button
             aria-label="Save sequence (Ctrl/Cmd + S)"
             className="btn btn-primary"
-            disabled={!dirty}
+            disabled={!dirty || draftChanged}
             onClick={save}
             title="Save (Ctrl/Cmd + S)"
             type="button"
           >
             <Save size={16} /><span>Save</span>
           </button>
-          <AccountControl account={account} onLeave={onLeave} />
+          <AccountControl account={account} onLeave={requestLeave} />
         </div>
       </header>
 
@@ -209,16 +261,8 @@ export default function Builder({ account, onLeave }) {
           enrollment={enrollment}
           key={selected?.id || 'empty-editor'}
           node={selected}
-          onApply={(node) => {
-            dispatch(updateNode(node))
-            setDraftChanged(false)
-            setMobileEditorOpen(false)
-            showToast(`${NODE_LABELS[node.type]} updated`)
-          }}
-          onClose={() => {
-            setDraftChanged(false)
-            setMobileEditorOpen(false)
-          }}
+          onApply={applyEditor}
+          onClose={closeEditor}
           onDraftChange={setDraftChanged}
           open={mobileEditorOpen}
         />
@@ -229,16 +273,35 @@ export default function Builder({ account, onLeave }) {
         <DeleteDialog
           onCancel={() => setDeleteTarget(null)}
           onDelete={() => {
+            const deletingSelected = deleteTarget.id === selectedNodeId
             dispatch(deleteNode(deleteTarget.id))
             setDeleteTarget(null)
-            setDraftChanged(false)
+            if (deletingSelected) {
+              setDraftChanged(false)
+              setMobileEditorOpen(false)
+            }
             showToast('Step deleted')
           }}
           target={deleteTarget}
         />
       )}
-      {pendingAction && (
-        <DiscardDialog onCancel={() => setPendingAction(null)} onDiscard={discardAndContinue} />
+      {pendingAction?.kind === 'leave' && (
+        <LeaveDialog
+          onCancel={() => setPendingAction(null)}
+          onLeave={() => {
+            setPendingAction(null)
+            setDraftChanged(false)
+            onLeave()
+          }}
+        />
+      )}
+      {pendingAction && pendingAction.kind !== 'leave' && (
+        <DiscardDialog
+          onCancel={() => setPendingAction(null)}
+          onDiscard={() => {
+            discardAndContinue()
+          }}
+        />
       )}
       {toast && <div className="toast" role="status"><CheckCircle2 size={17} /> {toast}</div>}
     </main>

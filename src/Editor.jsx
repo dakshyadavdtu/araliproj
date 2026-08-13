@@ -1,5 +1,5 @@
 import { AlertCircle, Eye, PanelRight, Users, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { NODE_LABELS, validateNode } from './workflow.js'
 import { NODE_DETAILS, NodeIcon } from './Workflow.jsx'
 
@@ -45,13 +45,20 @@ function SchedulerFields({ draft, update, errors }) {
     <div className="form-section">
       <div className="form-field">
         <span className="field-label">Frequency <span className="required-mark">*</span></span>
-        <div aria-label="Frequency" className="segmented-control" role="group">
+        <div
+          aria-describedby={errors.frequency ? 'frequency-error' : undefined}
+          aria-label="Frequency"
+          aria-required="true"
+          className="segmented-control"
+          role="group"
+        >
           {[
             ['daily', 'Daily'],
             ['weekdays', 'Weekdays'],
             ['weekly', 'Weekly'],
           ].map(([value, label]) => (
             <button
+              aria-pressed={draft.config.frequency === value}
               className="segment"
               data-selected={draft.config.frequency === value}
               key={value}
@@ -77,6 +84,7 @@ function SchedulerFields({ draft, update, errors }) {
             className="text-input"
             id="schedule-time"
             onChange={(event) => update({ time: event.target.value })}
+            required
             type="time"
             value={draft.config.time}
           />
@@ -87,9 +95,11 @@ function SchedulerFields({ draft, update, errors }) {
             <label htmlFor="schedule-weekday">Weekday <span className="required-mark">*</span></label>
             <select
               aria-invalid={Boolean(errors.weekday)}
+              aria-describedby={errors.weekday ? 'weekday-error' : undefined}
               className="select-input"
               id="schedule-weekday"
               onChange={(event) => update({ weekday: event.target.value })}
+              required
               value={draft.config.weekday}
             >
               <option value="">Choose day</option>
@@ -108,6 +118,7 @@ function SchedulerFields({ draft, update, errors }) {
           className="select-input"
           id="schedule-timezone"
           onChange={(event) => update({ timezone: event.target.value })}
+          required
           value={draft.config.timezone}
         >
           {zones.map((zone) => <option key={zone} value={zone}>{zone}</option>)}
@@ -125,12 +136,14 @@ function EnrollmentFields({ draft, update, errors }) {
       <div className="form-field">
         <label htmlFor="contact-name">Contact name <span className="required-mark">*</span></label>
         <input
+          aria-describedby={errors.contactName ? 'contact-name-error' : undefined}
           aria-invalid={Boolean(errors.contactName)}
           autoComplete="name"
           className="text-input"
           id="contact-name"
           onChange={(event) => update({ contactName: event.target.value })}
           placeholder="Alex Morgan"
+          required
           value={draft.config.contactName}
         />
         <FieldError id="contact-name-error" message={errors.contactName} />
@@ -146,6 +159,7 @@ function EnrollmentFields({ draft, update, errors }) {
           inputMode="email"
           onChange={(event) => update({ email: event.target.value })}
           placeholder="alex@example.com"
+          required
           type="email"
           value={draft.config.email}
         />
@@ -167,7 +181,13 @@ function ExitFields({ draft, update, errors }) {
     <div className="form-section">
       <div className="form-field">
         <span className="field-label">Leave the sequence when <span className="required-mark">*</span></span>
-        <div aria-label="Exit condition" className="radio-stack" role="radiogroup">
+        <div
+          aria-describedby={errors.condition ? 'condition-error' : undefined}
+          aria-label="Exit condition"
+          aria-required="true"
+          className="radio-stack"
+          role="radiogroup"
+        >
           {options.map(([value, title, description]) => (
             <label className="radio-option" data-selected={draft.config.condition === value} key={value}>
               <input
@@ -177,6 +197,7 @@ function ExitFields({ draft, update, errors }) {
                   condition: value,
                   days: value === 'after-days' ? draft.config.days : null,
                 })}
+                required
                 type="radio"
               />
               <span className="radio-copy">
@@ -192,11 +213,13 @@ function ExitFields({ draft, update, errors }) {
         <div className="form-field">
           <label htmlFor="exit-days">Number of days <span className="required-mark">*</span></label>
           <input
+            aria-describedby={errors.days ? 'days-error' : undefined}
             aria-invalid={Boolean(errors.days)}
             className="text-input"
             id="exit-days"
             min="1"
             onChange={(event) => update({ days: event.target.value === '' ? null : Number(event.target.value) })}
+            required
             step="1"
             type="number"
             value={draft.config.days ?? ''}
@@ -224,12 +247,14 @@ function EmailFields({ draft, enrollment, update, errors }) {
       <div className="form-field">
         <label htmlFor="email-subject">Subject <span className="required-mark">*</span></label>
         <input
+          aria-describedby={errors.subject ? 'subject-error' : undefined}
           aria-invalid={Boolean(errors.subject)}
           className="text-input"
           id="email-subject"
           maxLength={120}
           onChange={(event) => update({ subject: event.target.value })}
           placeholder="Welcome to Acme"
+          required
           value={draft.config.subject}
         />
         <FieldError id="subject-error" message={errors.subject} />
@@ -243,6 +268,7 @@ function EmailFields({ draft, enrollment, update, errors }) {
           id="email-body"
           onChange={(event) => update({ body: event.target.value })}
           placeholder={`Hi ${enrollment?.config.contactName.split(' ')[0] || 'there'},\n\nWrite your message here.`}
+          required
           value={draft.config.body}
         />
         <p className="field-hint" id="body-hint">Plain text keeps this sequence easy to review.</p>
@@ -264,35 +290,100 @@ function EmailFields({ draft, enrollment, update, errors }) {
 export default function Editor({ node, enrollment, open, onClose, onApply, onDraftChange }) {
   const [draft, setDraft] = useState(() => node ? structuredClone(node) : null)
   const [showErrors, setShowErrors] = useState(false)
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 860px)').matches)
+  const inspectorRef = useRef(null)
   const changed = Boolean(node && draft && JSON.stringify(node.config) !== JSON.stringify(draft.config))
   const validation = useMemo(() => draft ? validateNode(draft) : null, [draft])
   const errors = showErrors ? validation?.errors || {} : {}
+
+  const cancel = useCallback(() => {
+    setDraft(node ? structuredClone(node) : null)
+    setShowErrors(false)
+    onDraftChange(false)
+    onClose()
+  }, [node, onClose, onDraftChange])
 
   useEffect(() => {
     onDraftChange(changed)
     return () => onDraftChange(false)
   }, [changed, onDraftChange])
 
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 860px)')
+    const updateMobile = () => setIsMobile(media.matches)
+    updateMobile()
+    media.addEventListener('change', updateMobile)
+    return () => media.removeEventListener('change', updateMobile)
+  }, [])
+
+  useEffect(() => {
+    if (!isMobile || !open || !node) return undefined
+
+    const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    window.requestAnimationFrame(() => {
+      inspectorRef.current?.querySelector('input, select, textarea, button')?.focus()
+    })
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        cancel()
+        return
+      }
+
+      if (event.key !== 'Tab') return
+      const focusable = inspectorRef.current?.querySelectorAll(
+        'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      )
+      if (!focusable?.length) return
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
+      previousFocus?.focus()
+    }
+  }, [cancel, isMobile, node, open])
+
   function update(config) {
     setDraft((current) => ({ ...current, config: { ...current.config, ...config } }))
   }
 
-  function cancel() {
-    setDraft(node ? structuredClone(node) : null)
-    setShowErrors(false)
-    onDraftChange(false)
-    onClose()
-  }
-
   function apply() {
     setShowErrors(true)
-    if (!draft || !validation?.valid) return
+    if (!draft || !validation?.valid) {
+      window.requestAnimationFrame(() => {
+        inspectorRef.current?.querySelector('[aria-invalid="true"]')?.focus()
+      })
+      return
+    }
     onApply(draft)
     setShowErrors(false)
   }
 
   return (
-    <aside aria-label="Step editor" className="inspector" data-open={open}>
+    <aside
+      aria-hidden={isMobile && !open ? 'true' : undefined}
+      aria-label="Step editor"
+      aria-modal={isMobile && open ? 'true' : undefined}
+      className="inspector"
+      data-open={open}
+      inert={isMobile && !open ? true : undefined}
+      ref={inspectorRef}
+      role={isMobile && open ? 'dialog' : undefined}
+    >
       {!node || !draft ? (
         <div className="inspector-empty">
           <div>

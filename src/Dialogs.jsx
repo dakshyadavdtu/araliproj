@@ -10,18 +10,42 @@ import { NodeIcon } from './Workflow.jsx'
 
 function Modal({ title, description, children, footer, onClose, wide = false }) {
   const closeRef = useRef(null)
+  const dialogRef = useRef(null)
 
   useEffect(() => {
     const previousFocus = document.activeElement
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     closeRef.current?.focus()
 
-    function closeOnEscape(event) {
-      if (event.key === 'Escape') onClose()
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onClose()
+        return
+      }
+
+      if (event.key !== 'Tab') return
+      const focusable = dialogRef.current?.querySelectorAll(
+        'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+      )
+      if (!focusable?.length) return
+
+      const first = focusable[0]
+      const last = focusable[focusable.length - 1]
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
     }
 
-    document.addEventListener('keydown', closeOnEscape)
+    document.addEventListener('keydown', handleKeyDown)
     return () => {
-      document.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('keydown', handleKeyDown)
+      document.body.style.overflow = previousOverflow
       previousFocus?.focus()
     }
   }, [onClose])
@@ -34,6 +58,7 @@ function Modal({ title, description, children, footer, onClose, wide = false }) 
         aria-modal="true"
         className={`modal-card${wide ? ' modal-card-preview' : ''}`}
         onMouseDown={(event) => event.stopPropagation()}
+        ref={dialogRef}
         role="dialog"
       >
         <header className="modal-heading">
@@ -57,7 +82,7 @@ export function PreviewDialog({ sequence, onClose }) {
   const narrative = getSequenceNarrative(sequence)
   const scheduler = sequence.nodes.find((node) => node.type === 'scheduler')
   const enrollment = sequence.nodes.find((node) => node.type === 'enrollment')
-  const incomplete = validation.issues
+  const incomplete = [...new Set(validation.issues.map((issue) => issue.message))]
 
   return (
     <Modal
@@ -142,6 +167,26 @@ export function DiscardDialog({ onCancel, onDiscard }) {
       title="Discard unapplied edits?"
     >
       <p className="dialog-copy">Apply your changes first if you want to keep them.</p>
+    </Modal>
+  )
+}
+
+export function LeaveDialog({ onCancel, onLeave }) {
+  return (
+    <Modal
+      description="This sequence has changes that have not been saved in this browser."
+      footer={(
+        <>
+          <button className="btn btn-secondary" onClick={onCancel} type="button">Stay and review</button>
+          <button className="btn btn-danger" onClick={onLeave} type="button">
+            Leave without saving <ChevronRight size={15} />
+          </button>
+        </>
+      )}
+      onClose={onCancel}
+      title="Leave with unsaved changes?"
+    >
+      <p className="dialog-copy">Save applied changes, or apply the current step edits, before leaving if you want to keep them.</p>
     </Modal>
   )
 }

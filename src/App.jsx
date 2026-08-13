@@ -6,6 +6,7 @@ export default function App() {
     <AuthGate>
       {({ profile, authMode, signOut }) => (
         <Builder
+          accountId={profile.id}
           account={{
             ...profile,
             isGuest: authMode === 'guest',

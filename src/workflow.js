@@ -484,7 +484,17 @@ function browserStorage() {
   }
 }
 
-export function saveSequence(sequence, storage = browserStorage()) {
+function safeStorageScope(scope) {
+  const normalized = typeof scope === 'string' ? scope.trim() : ''
+  return normalized ? normalized.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 160) : ''
+}
+
+export function getStorageKey(scope) {
+  const safeScope = safeStorageScope(scope)
+  return safeScope ? `${STORAGE_KEY}.${safeScope}` : STORAGE_KEY
+}
+
+export function saveSequence(sequence, storage = browserStorage(), scope = '') {
   if (!storage) return null
 
   const savedAt = new Date().toISOString()
@@ -492,18 +502,18 @@ export function saveSequence(sequence, storage = browserStorage()) {
   const record = { version: STORAGE_VERSION, savedAt, sequence: savedSequence }
 
   try {
-    storage.setItem(STORAGE_KEY, JSON.stringify(record))
+    storage.setItem(getStorageKey(scope), JSON.stringify(record))
     return record
   } catch {
     return null
   }
 }
 
-export function loadSequence(storage = browserStorage()) {
+export function loadSequence(storage = browserStorage(), scope = '') {
   if (!storage) return null
 
   try {
-    const raw = storage.getItem(STORAGE_KEY)
+    const raw = storage.getItem(getStorageKey(scope))
     if (!raw) return null
 
     const record = JSON.parse(raw)

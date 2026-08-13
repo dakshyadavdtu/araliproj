@@ -54,12 +54,20 @@ function NodePicker({ nodes, onAdd, onClose }) {
       if (event.key === 'Escape') onClose()
     }
 
+    function closeOnOutsideClick(event) {
+      if (!pickerRef.current?.contains(event.target)) onClose()
+    }
+
     document.addEventListener('keydown', closeOnEscape)
-    return () => document.removeEventListener('keydown', closeOnEscape)
+    document.addEventListener('pointerdown', closeOnOutsideClick)
+    return () => {
+      document.removeEventListener('keydown', closeOnEscape)
+      document.removeEventListener('pointerdown', closeOnOutsideClick)
+    }
   }, [onClose])
 
   return (
-    <div aria-label="Choose a step" className="node-picker" ref={pickerRef} role="menu">
+    <div aria-label="Choose a step" className="node-picker" ref={pickerRef} role="group">
       <p className="picker-label">Add a step</p>
       {Object.entries(NODE_DETAILS).map(([type, details]) => {
         const availability = canAddNode(nodes, type)
@@ -70,7 +78,6 @@ function NodePicker({ nodes, onAdd, onClose }) {
             disabled={!availability.allowed}
             key={type}
             onClick={() => onAdd(type)}
-            role="menuitem"
             title={availability.reason || undefined}
             type="button"
           >
@@ -91,15 +98,21 @@ function NodePicker({ nodes, onAdd, onClose }) {
 
 function AddControl({ index, nodes, openIndex, setOpenIndex, onAdd, end = false }) {
   const open = openIndex === index
+  const triggerRef = useRef(null)
+
+  function closePicker() {
+    setOpenIndex(null)
+    window.requestAnimationFrame(() => triggerRef.current?.focus())
+  }
 
   return (
     <div className={`picker-anchor ${end ? 'end-add' : 'connector'}`}>
       <button
         aria-expanded={open}
-        aria-haspopup="menu"
         aria-label={end ? 'Add a step at the end' : `Add a step at position ${index + 1}`}
         className={end ? 'btn btn-secondary' : 'add-trigger'}
         onClick={() => setOpenIndex(open ? null : index)}
+        ref={triggerRef}
         type="button"
       >
         <Plus size={end ? 16 : 15} />
@@ -112,7 +125,7 @@ function AddControl({ index, nodes, openIndex, setOpenIndex, onAdd, end = false 
             onAdd(type, index)
             setOpenIndex(null)
           }}
-          onClose={() => setOpenIndex(null)}
+          onClose={closePicker}
         />
       )}
     </div>
@@ -230,7 +243,6 @@ export default function Workflow({
                 <div className="picker-anchor">
                   <button
                     aria-expanded={pickerIndex === 0}
-                    aria-haspopup="menu"
                     className="btn btn-primary"
                     onClick={() => onPickerChange(pickerIndex === 0 ? null : 0)}
                     type="button"

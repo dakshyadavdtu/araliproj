@@ -7,11 +7,10 @@ import {
   createSampleSequence,
   DEFAULT_SEQUENCE_NAME,
   isSequenceDirty,
-  loadSequence,
   validateSequence,
 } from './workflow.js'
 
-export function createSequenceState(saved = loadSequence()) {
+export function createSequenceState(saved = null) {
   const sequence = saved?.sequence ? cloneSequence(saved.sequence) : createEmptySequence()
 
   return {
@@ -80,7 +79,8 @@ export const sequenceSlice = createSlice({
       state.selectedNodeId = nodeId
     },
     hydrateSequence(state, action) {
-      const { sequence, savedAt = sequence.updatedAt } = action.payload
+      const sequence = action.payload?.sequence ?? createEmptySequence()
+      const savedAt = action.payload?.savedAt ?? null
       state.sequence = cloneSequence(sequence)
       state.savedSnapshot = cloneSequence(sequence)
       state.selectedNodeId = null
